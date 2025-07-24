@@ -20,6 +20,7 @@ body {
 /* Mapbox GL overrides */
 .mapboxgl-canvas {
   outline: none;
+  background: #f8fafc !important; /* Fondo claro mientras carga */
 }
 
 .mapboxgl-ctrl-bottom-left,
@@ -27,11 +28,33 @@ body {
   display: none;
 }
 
+/* Mejorar la carga del mapa */
+.mapboxgl-map {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
+/* Estilos para el marcador de usuario */
+.user-location-marker {
+  z-index: 1000;
+}
+
 /* Estilos para los marcadores de incidencias - FIJOS */
 .incident-marker-wrapper {
   cursor: pointer;
   position: relative;
   z-index: 1;
+}
+
+/* Mejorar el popup del usuario */
+.mapboxgl-popup-content {
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+  border: 1px solid #e5e7eb !important;
+  padding: 12px !important;
+}
+
+.mapboxgl-popup-tip {
+  border-top-color: white !important;
 }
 
 /* Popup limpio y sólido (sin transparencias) */
@@ -46,6 +69,28 @@ body {
 
 .clean-incident-popup .mapboxgl-popup-tip {
   border-top-color: white;
+}
+
+/* Mejorar la experiencia de carga */
+.map-loading {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.map-loading::before {
+  content: '';
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top: 3px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 12px;
 }
 
 /* Cursor personalizado */

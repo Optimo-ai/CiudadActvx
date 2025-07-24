@@ -1,14 +1,16 @@
 export const MAP_CONFIG = {
   // Mapbox configuration - will be injected by Vite
-  MAPBOX_TOKEN: import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoiYWxleGFuZGVyLW1hdG9zIiwiYSI6ImNtYno0OG5odjFuZjEya3B0bnRlZjVvcjQifQ.Tbw9vFzLJJP2Yharn7njpw',
+  MAPBOX_TOKEN: import.meta.env?.VITE_MAPBOX_TOKEN || (typeof window !== 'undefined' && window.location.hostname.includes('vercel') 
+    ? 'pk.eyJ1IjoiYWxleGFuZGVyLW1hdG9zIiwiYSI6ImNtYno0OG5odjFuZjEya3B0bnRlZjVvcjQifQ.Tbw9vFzLJJP2Yharn7njpw'
+    : 'pk.eyJ1IjoiYWxleGFuZGVyLW1hdG9zIiwiYSI6ImNtYno0OG5odjFuZjEya3B0bnRlZjVvcjQifQ.Tbw9vFzLJJP2Yharn7njpw'),
   
   // Default map settings
   DEFAULT_CENTER: {
-    lng: -74.0060, // Bogotá, Colombia (ajusta según tu ciudad)
-    lat: 4.7110
+    lng: -69.9312, // Santo Domingo, República Dominicana
+    lat: 18.4861
   },
   
-  DEFAULT_ZOOM: 12,
+  DEFAULT_ZOOM: 13,
   
   // Map style
   MAP_STYLE: 'mapbox://styles/mapbox/streets-v12',

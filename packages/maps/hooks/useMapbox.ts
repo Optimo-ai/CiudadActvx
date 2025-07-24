@@ -2,13 +2,27 @@ import { useState, useEffect } from 'react';
 import { MAP_CONFIG } from '../../utils/constants/map-config';
 import type { Coordinates, MapViewport } from '../../types/maps';
 
-export const useMapbox = () => {
+interface UseMapboxOptions {
+  userLocation?: Coordinates | null;
+}
+
+export const useMapbox = (options?: UseMapboxOptions) => {
   const [viewport, setViewport] = useState<MapViewport>({
-    center: MAP_CONFIG.DEFAULT_CENTER,
+    center: options?.userLocation || MAP_CONFIG.DEFAULT_CENTER,
     zoom: MAP_CONFIG.DEFAULT_ZOOM
   });
   
   const [isLoaded, setIsLoaded] = useState(false);
+
+  // Actualizar viewport cuando cambie la ubicación del usuario
+  useEffect(() => {
+    if (options?.userLocation) {
+      setViewport(prev => ({
+        ...prev,
+        center: options.userLocation!
+      }));
+    }
+  }, [options?.userLocation]);
 
   useEffect(() => {
     // Check if Mapbox token is available

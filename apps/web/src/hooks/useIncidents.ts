@@ -1,7 +1,32 @@
 import { useState, useEffect } from 'react';
 import { IncidentReport, CreateIncidentData, IncidentStatus, IncidentPriority, IncidentCategory } from '@ciudad-activa/types';
 
-const STORAGE_KEY = 'ciudad-activa-incidents';
+// Usar una clave única que incluya el dominio para evitar conflictos
+const STORAGE_KEY = `ciudad-activa-incidents-${window.location.hostname}`;
+
+// Función para sincronizar con servidor (simulada para demo)
+const syncWithServer = async (incidents: IncidentReport[]) => {
+  try {
+    // En producción, aquí harías una llamada a tu API
+    // await fetch('/api/incidents', { method: 'POST', body: JSON.stringify(incidents) });
+    console.log('Sincronizando incidencias con servidor...', incidents.length);
+  } catch (error) {
+    console.error('Error al sincronizar con servidor:', error);
+  }
+};
+
+// Función para cargar desde servidor (simulada para demo)
+const loadFromServer = async (): Promise<IncidentReport[] | null> => {
+  try {
+    // En producción, aquí harías una llamada a tu API
+    // const response = await fetch('/api/incidents');
+    // return await response.json();
+    return null; // Por ahora retornamos null para usar localStorage
+  } catch (error) {
+    console.error('Error al cargar desde servidor:', error);
+    return null;
+  }
+};
 
 // Datos de ejemplo
 const EXAMPLE_INCIDENTS: IncidentReport[] = [
@@ -72,36 +97,75 @@ export const useIncidents = () => {
 
   // Cargar incidencias del localStorage
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        // Convertir strings de fecha a objetos Date
-        const processedIncidents = parsed.map((incident: any) => ({
-          ...incident,
-          reportedAt: new Date(incident.reportedAt),
-          updatedAt: new Date(incident.updatedAt),
-          estimatedResolution: incident.estimatedResolution 
-            ? new Date(incident.estimatedResolution) 
-            : undefined
-        }));
-        setIncidents(processedIncidents);
-      } else {
-        // Si no hay datos, usar ejemplos
+    const loadIncidents = async () => {
+      try {
+        // Intentar cargar desde servidor primero
+        const serverIncidents = await loadFromServer();
+        
+        if (serverIncidents) {
+          const processedIncidents = serverIncidents.map((incident: any) => ({
+            ...incident,
+            reportedAt: new Date(incident.reportedAt),
+            updatedAt: new Date(incident.updatedAt),
+            estimatedResolution: incident.estimatedResolution 
+              ? new Date(incident.estimatedResolution) 
+              : undefined
+          }));
+          setIncidents(processedIncidents);
+          // Guardar en localStorage como backup
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(processedIncidents));
+        } else {
+          // Cargar desde localStorage si no hay datos del servidor
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            const processedIncidents = parsed.map((incident: any) => ({
+              ...incident,
+              reportedAt: new Date(incident.reportedAt),
+              updatedAt: new Date(incident.updatedAt),
+              estimatedResolution: incident.estimatedResolution 
+                ? new Date(incident.estimatedResolution) 
+                : undefined
+            }));
+            setIncidents(processedIncidents);
+          } else {
+            // Si no hay datos, usar ejemplos y guardarlos
+            setIncidents(EXAMPLE_INCIDENTS);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(EXAMPLE_INCIDENTS));
+          }
+        }
+      } catch (error) {
+        console.error('Error loading incidents:', error);
+        // Fallback a datos de ejemplo
         setIncidents(EXAMPLE_INCIDENTS);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(EXAMPLE_INCIDENTS));
       }
-    } catch (error) {
-      console.error('Error loading incidents:', error);
-      setIncidents(EXAMPLE_INCIDENTS);
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+
+    loadIncidents();
   }, []);
 
-  // Guardar en localStorage cuando cambien las incidencias
+  // Sincronizar con servidor cuando cambien las incidencias
+  useEffect(() => {
+    if (incidents.length > 0 && !loading) {
+      // Debounce para evitar muchas llamadas
+      const timeoutId = setTimeout(() => {
+        syncWithServer(incidents);
+      }, 2000);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [incidents, loading]);
+
+  // Guardar en localStorage cuando cambien las incidencias (backup local)
   const saveIncidents = (newIncidents: IncidentReport[]) => {
     setIncidents(newIncidents);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newIncidents));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newIncidents));
+    } catch (error) {
+      console.error('Error saving incidents to localStorage:', error);
+    }
   };
 
   const createIncident = (data: CreateIncidentData): IncidentReport => {

@@ -8,7 +8,9 @@ import { IncidentFormModal } from './IncidentFormModal';
 import { MapLegend } from './MapLegend';
 import { IncidentDetailsPanel } from './IncidentDetailsPanel';
 import { useIncidents } from '../hooks/useIncidents';
+import { useGeolocation } from '../hooks/useGeolocation';
 import { AppHeader } from './AppHeader';
+import { LocationPermissionModal } from './LocationPermissionModal';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 interface CityMapProps {
@@ -19,8 +21,23 @@ export const CityMap: React.FC<CityMapProps> = ({ className }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<{ id: string; marker: mapboxgl.Marker }[]>([]);
+  const userLocationMarker = useRef<mapboxgl.Marker | null>(null);
 
-  const { viewport, isLoaded, mapboxToken } = useMapbox();
+  // Hook de geolocalización
+  const { coordinates: userLocation, loading: locationLoading, error: locationError } = useGeolocation();
+  
+  // Mostrar modal de ubicación si hay error o no se ha obtenido ubicación
+  useEffect(() => {
+    if (!locationLoading && !userLocation && !locationError) {
+      const timer = setTimeout(() => {
+        setShowLocationModal(true);
+      }, 2000); // Mostrar después de 2 segundos
+      
+      return () => clearTimeout(timer);
+    }
+  }, [locationLoading, userLocation, locationError]);
+
+  const { viewport, isLoaded, mapboxToken } = useMapbox({ userLocation });
   const { incidents, createIncident } = useIncidents();
 
   const [mostrarHeatmap, setMostrarHeatmap] = useState(false);
@@ -29,6 +46,7 @@ export const CityMap: React.FC<CityMapProps> = ({ className }) => {
   const [selectedIncident, setSelectedIncident] = useState<IncidentReport | null>(null);
   const [isDetailsPanelOpen, setIsDetailsPanelOpen] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
 
   const pressTimer = useRef<number | null>(null);
   const initialPosition = useRef<{ x: number; y: number } | null>(null);
@@ -39,7 +57,7 @@ export const CityMap: React.FC<CityMapProps> = ({ className }) => {
       : 'mapbox://styles/mapbox/streets-v12';
 
   useEffect(() => {
-    if (!isLoaded || !mapContainer.current || map.current) return;
+    if (!isLoaded || !mapContainer.current || map.current || !mapboxToken) return;
 
     mapboxgl.accessToken = mapboxToken;
 
@@ -53,15 +71,91 @@ export const CityMap: React.FC<CityMapProps> = ({ className }) => {
     map.current.on('load', () => {
       loadIncidentsOnMap();
       if (mostrarHeatmap) applyHeatmapLayer();
+      addUserLocationMarker();
     });
 
     map.current.on('styledata', () => {
       loadIncidentsOnMap();
       if (mostrarHeatmap) applyHeatmapLayer();
+      addUserLocationMarker();
     });
 
     return () => map.current?.remove();
-  }, [isLoaded, mapboxToken, viewport]);
+  }, [isLoaded, mapboxToken, viewport, userLocation]);
+
+  // Agregar marcador de ubicación del usuario
+  const addUserLocationMarker = useCallback(() => {
+    if (!map.current || !userLocation) return;
+
+    // Remover marcador anterior si existe
+    if (userLocationMarker.current) {
+      userLocationMarker.current.remove();
+    }
+
+    // Crear elemento personalizado para el marcador del usuario
+    const el = document.createElement('div');
+    el.className = 'user-location-marker';
+    el.style.cssText = `
+      width: 20px;
+      height: 20px;
+      background: #4285f4;
+      border: 3px solid white;
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      cursor: pointer;
+      position: relative;
+    `;
+
+    // Agregar pulso animado
+    const pulse = document.createElement('div');
+    pulse.style.cssText = `
+      position: absolute;
+      top: -10px;
+      left: -10px;
+      width: 40px;
+      height: 40px;
+      border: 2px solid #4285f4;
+      border-radius: 50%;
+      opacity: 0.6;
+      animation: pulse 2s infinite;
+    `;
+    el.appendChild(pulse);
+
+    // Agregar CSS para la animación
+    if (!document.getElementById('user-location-styles')) {
+      const style = document.createElement('style');
+      style.id = 'user-location-styles';
+      style.textContent = `
+        @keyframes pulse {
+          0% {
+            transform: scale(0.8);
+            opacity: 0.6;
+          }
+          50% {
+            transform: scale(1.2);
+            opacity: 0.3;
+          }
+          100% {
+            transform: scale(0.8);
+            opacity: 0.6;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    userLocationMarker.current = new mapboxgl.Marker({ element: el })
+      .setLngLat([userLocation.lng, userLocation.lat])
+      .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
+        <div class='text-sm'>
+          <strong>📍 Tu ubicación</strong>
+          <p class='text-xs text-gray-500 mt-1'>
+            ${userLocation.lat.toFixed(6)}, ${userLocation.lng.toFixed(6)}
+          </p>
+        </div>
+      `))
+      .addTo(map.current);
+  }, [userLocation]);
 
   const loadIncidentsOnMap = useCallback(() => {
     if (!map.current) return;
@@ -211,6 +305,28 @@ export const CityMap: React.FC<CityMapProps> = ({ className }) => {
         onToggleHeatmap={() => setMostrarHeatmap(prev => !prev)}
       />
 
+      {/* Indicador de ubicación */}
+      {locationLoading && (
+        <div className="absolute top-20 left-4 bg-white/95 backdrop-blur-md border border-gray-200 rounded-lg px-3 py-2 shadow-lg z-40">
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-gray-700">Obteniendo ubicación...</span>
+          </div>
+        </div>
+      )}
+
+      {locationError && (
+        <div className="absolute top-20 left-4 bg-red-50 border border-red-200 rounded-lg px-3 py-2 shadow-lg z-40 max-w-xs">
+          <div className="flex items-start gap-2 text-sm">
+            <span className="text-red-500 text-lg">⚠️</span>
+            <div>
+              <p className="text-red-800 font-medium">Error de ubicación</p>
+              <p className="text-red-600 text-xs mt-1">{locationError}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div ref={mapContainer} className="h-full w-full" />
 
       {selectedCoordinates && (
@@ -254,6 +370,16 @@ export const CityMap: React.FC<CityMapProps> = ({ className }) => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <LocationPermissionModal
+        isOpen={showLocationModal}
+        onClose={() => setShowLocationModal(false)}
+        onRequestLocation={() => {
+          requestLocation();
+          setShowLocationModal(false);
+        }}
+        error={locationError}
+      />
     </motion.div>
   );
 };
